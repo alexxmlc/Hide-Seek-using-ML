@@ -1,6 +1,6 @@
-CELL_SIZE = 20
-GRID_WIDTH = 30
-GRID_HEIGHT = 25
+CELL_SIZE = 40
+GRID_WIDTH = 25
+GRID_HEIGHT = 20
 
 WHITE = (255, 255, 255) # flooe
 BLACK = (0, 0, 0)       # wall

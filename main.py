@@ -13,7 +13,7 @@ clock = pygame.time.Clock()
 
 env = Environment()
 seek = Agent(1, 1, RED)
-hide = Agent(28, 23, BLUE)
+hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE)
 
 
 # main loop
@@ -34,16 +34,8 @@ while running:
             grid_y = mouse_y // CELL_SIZE
             env.toggle_door(grid_x, grid_y)
         
-        # manual control for seek
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                seek.move(-1, 0, env)
-            if event.key == pygame.K_RIGHT:
-                seek.move(1, 0, env)
-            if event.key == pygame.K_UP:
-                seek.move(0, -1, env)
-            if event.key == pygame.K_DOWN:
-                seek.move(0, 1, env)
+        # seek logic
+        seek.think_and_move(env, hide)
                 
         if seek.x == hide.x and seek.y == hide.y:
             seek.reset()
