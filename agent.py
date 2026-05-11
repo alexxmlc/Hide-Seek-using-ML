@@ -9,14 +9,37 @@ class Agent:
         self.start_y = start_y
         self.color = color
         self.brain = create_brain()
+        self.memory = []
         
-    def move(self, dx, dy, env):
+    def remember(self, new_mem):
+        if len(self.memory) == 10000:
+            self.memory.pop(0)
+        self.memory.append(new_mem)
+        
+    def move(self, dx, dy, env, target):
         new_x = self.x + dx
         new_y = self.y + dy
+        reward = 0
+             
+        # hits it's head in the wall
+        if env.grid[new_y, new_x] == 1 or env.grid[new_y, new_x] == 2:
+            reward -= 0.75
         
-        if env.grid[new_y, new_x] == 0:
+        # caught the hide
+        elif new_x == target.x and new_y == target.y:
+            reward += 1.0
             self.x = new_x
             self.y = new_y
+            return reward, True
+            
+        
+        # wastes time on empty cells
+        elif env.grid[new_y, new_x] == 0:
+            reward -= 0.05
+            self.x = new_x
+            self.y = new_y
+            
+        return reward, False
             
     def reset(self):
         self.x = self.start_x
@@ -67,6 +90,15 @@ class Agent:
         elif best_decision == 3:
             dx, dy = 1, 0
             
-        self.move(dx, dy, env)
+        reward, done = self.move(dx, dy, env, target)
+        old_state = reshaped_view
+        new_state = np.reshape(self.observe(env, target=target), (1, 5, 5, 1))
+        
+        new_mem = (old_state, best_decision, reward, new_state, done)
+        
+        self.remember(new_mem)
+        
+    def train(self, batch_size):
+        return
             
         
