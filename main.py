@@ -13,6 +13,7 @@ clock = pygame.time.Clock()
 
 env = Environment()
 seek = Agent(1, 1, RED)
+seek.load_model('seeker.keras')
 hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE)
 
 
@@ -21,9 +22,27 @@ running = True
 frame_count = 0
 while running:
     
+    # seek logic
+    seek.think_and_move(env, hide)
+    if len(seek.memory) >= 64 and frame_count % 10 == 0:
+            seek.train(64)
+                
+    if seek.x == hide.x and seek.y == hide.y:
+        seek.reset()
+        hide.reset()
+        print("Gotcha!")
+            
+    frame_count += 1
+        
+    if frame_count % 10 == 0:
+        options = [(0, - 1), (0, 1), (1, 0), (-1, 0), (0, 0)]
+        dx, dy = random.choice(options)
+        hide.move(dx, dy, env)
+        
     # event logic
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            seek.save_model('seeker.keras')
             pygame.quit()
             sys.exit()
         
@@ -33,21 +52,6 @@ while running:
             grid_x = mouse_x // CELL_SIZE
             grid_y = mouse_y // CELL_SIZE
             env.toggle_door(grid_x, grid_y)
-        
-        # seek logic
-        seek.think_and_move(env, hide)
-                
-        if seek.x == hide.x and seek.y == hide.y:
-            seek.reset()
-            hide.reset()
-            print("Gotcha!")
-            
-        frame_count += 1
-        
-        if frame_count % 10 == 0:
-            options = [(0, - 1), (0, 1), (1, 0), (-1, 0), (0, 0)]
-            dx, dy = random.choice(options)
-            hide.move(dx, dy, env)
     
     # draw the map
     screen.fill(WHITE)
@@ -74,5 +78,5 @@ while running:
     # refresh screen
     pygame.display.flip()
     clock.tick(30)
-
+    
 pygame.quit()

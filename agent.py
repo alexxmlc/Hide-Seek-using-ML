@@ -1,4 +1,7 @@
 import numpy as np
+import random
+import os
+from keras.models import load_model
 from brain import create_brain
 
 class Agent:
@@ -10,13 +13,16 @@ class Agent:
         self.color = color
         self.brain = create_brain()
         self.memory = []
+        self.epsilon = 1.0
+        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.01
         
     def remember(self, new_mem):
         if len(self.memory) == 10000:
             self.memory.pop(0)
         self.memory.append(new_mem)
         
-    def move(self, dx, dy, env, target):
+    def move(self, dx, dy, env, target=None):
         new_x = self.x + dx
         new_y = self.y + dy
         reward = 0
@@ -26,7 +32,7 @@ class Agent:
             reward -= 0.75
         
         # caught the hide
-        elif new_x == target.x and new_y == target.y:
+        elif target  is not None and new_x == target.x and new_y == target.y:
             reward += 1.0
             self.x = new_x
             self.y = new_y
@@ -75,11 +81,14 @@ class Agent:
     def think_and_move(self, env, target):
         view = self.observe(env, target=target)
         reshaped_view = np.reshape(view, (1, 5, 5, 1))
-        
         predictions = self.brain.predict(reshaped_view, verbose=0)
+        random_number = random.random()
         
         # 0 -> up / 1 -> down / 2 -> left / 3 -> right
-        best_decision = np.argmax(predictions[0]) 
+        if random_number <= self.epsilon:
+            best_decision = random.randint(0, 3)
+        else:
+            best_decision = np.argmax(predictions[0]) 
         
         if best_decision == 0:
             dx, dy = 0, -1
@@ -98,7 +107,85 @@ class Agent:
         
         self.remember(new_mem)
         
+        
     def train(self, batch_size):
-        return
+        random_memories = random.sample(self.memory, batch_size)
+        gamma = 0.95
+        
+       
+        old_states = []
+        new_states = []
+        
+        # extract the matrices 
+        for old_state, best_decision, reward, new_state, done in random_memories:
+            old_states.append(old_state[0]) 
+            new_states.append(new_state[0])
+            
+        old_states = np.array(old_states) # (64, 5, 5, 1)
+        new_states = np.array(new_states)
+        
+        # the prediction optimization (2 predict calls instead of 128)
+        current_scores = self.brain.predict(old_states, verbose=0)
+        future_scores = self.brain.predict(new_states, verbose=0)
+        
+        # apply Bellman ecuation
+        X = old_states
+        Y = np.copy(current_scores)
+        
+        for i, (old_state, best_decision, reward, new_state, done) in enumerate(random_memories):
+            if done is True:
+                target = reward
+            else:
+                target = reward + gamma * np.max(future_scores[i])
+                
+            Y[i][best_decision] = target
+            
+        # final train
+        self.brain.fit(X, Y, batch_size=batch_size, verbose=0)
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+    
+    def save_model(self, file_path):
+        self.brain.save(file_path)
+        
+    def load_model(self, file_path):
+        if os.path.exists(file_path):
+            self.brain = load_model(file_path) 
+            self.epsilon = 0.01
+            print("Brain loaded")
+        else:
+            print("File not yet created")
+            
+            
+
+    # def train(self, batch_size):
+    #     random_memories = random.sample(self.memory, batch_size)
+    #     gamma = 0.95
+    #     X = []
+    #     Y = []
+    #     start_time = time.time()
+        
+    #     for old_state, best_decision, reward, new_state, done in random_memories:
+    #         current_scores = self.brain.predict(old_state, verbose=0)
+    #         future_scores = self.brain.predict(new_state, verbose=0)
+            
+    #         if done is True:
+    #             target = reward
+    #         else:
+    #             target = reward + gamma * np.max(future_scores)
+                
+    #         current_scores[0][best_decision] = target
+    #         X.append(old_state[0])
+    #         Y.append(current_scores[0])
+            
+    #     mid_time = time.time()
+            
+    #     self.brain.train_on_batch(np.array(X), np.array(Y)) 
+    #     self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        
+    #     final_time = time.time()
+        
+    #     print(f"Bucla FOR (predictii): {mid_time - start_time:.4f} secunde")
+    #     print(f"Train on Batch: {final_time - mid_time:.4f} secunde")
+    #     print("-" * 30)
             
         
