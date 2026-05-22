@@ -11,11 +11,13 @@ class Agent:
         self.start_x = start_x
         self.start_y = start_y
         self.color = color
-        self.brain = create_brain()
+        self.active_brain = create_brain()
+        self.target_brain = create_brain()
         self.memory = []
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.01
+        self.loss_history = []
         
     def remember(self, new_mem):
         if len(self.memory) == 10000:
@@ -81,7 +83,7 @@ class Agent:
     def think_and_move(self, env, target):
         view = self.observe(env, target=target)
         reshaped_view = np.reshape(view, (1, 5, 5, 1))
-        predictions = self.brain.predict(reshaped_view, verbose=0)
+        predictions = self.active_brain.predict(reshaped_view, verbose=0)
         random_number = random.random()
         
         # 0 -> up / 1 -> down / 2 -> left / 3 -> right
@@ -106,6 +108,7 @@ class Agent:
         new_mem = (old_state, best_decision, reward, new_state, done)
         
         self.remember(new_mem)
+        return reward
         
         
     def train(self, batch_size):
@@ -125,8 +128,8 @@ class Agent:
         new_states = np.array(new_states)
         
         # the prediction optimization (2 predict calls instead of 128)
-        current_scores = self.brain.predict(old_states, verbose=0)
-        future_scores = self.brain.predict(new_states, verbose=0)
+        current_scores = self.active_brain.predict(old_states, verbose=0)
+        future_scores = self.target_brain.predict(new_states, verbose=0)
         
         # apply Bellman ecuation
         X = old_states
@@ -141,19 +144,25 @@ class Agent:
             Y[i][best_decision] = target
             
         # final train
-        self.brain.fit(X, Y, batch_size=batch_size, verbose=0)
+        history = self.active_brain.fit(X, Y, batch_size=batch_size, verbose=0)
+        self.loss_history.append(history.history['loss'][0])
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        
+    def update_target_network(self):
+        self.target_brain.set_weights(self.active_brain.get_weights())
     
     def save_model(self, file_path):
-        self.brain.save(file_path)
+        self.active_brain.save(file_path)
         
     def load_model(self, file_path):
         if os.path.exists(file_path):
-            self.brain = load_model(file_path) 
+            self.active_brain = load_model(file_path) 
             self.epsilon = 0.01
             print("Brain loaded")
         else:
             print("File not yet created")
+            
+    
             
             
 

@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import matplotlib.pyplot as plt
 from settings import *
 from environment import Environment
 from agent import Agent
@@ -13,8 +14,11 @@ clock = pygame.time.Clock()
 
 env = Environment()
 seek = Agent(1, 1, RED)
-seek.load_model('seeker.keras')
+# seek.load_model('seeker.keras')
 hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE)
+episode_total_reward = 0.0
+episodes = []
+episode_count = 0
 
 
 # main loop
@@ -23,14 +27,19 @@ frame_count = 0
 while running:
     
     # seek logic
-    seek.think_and_move(env, hide)
+    step_reward = seek.think_and_move(env, hide)
+    episode_total_reward += step_reward
     if len(seek.memory) >= 64 and frame_count % 10 == 0:
             seek.train(64)
                 
     if seek.x == hide.x and seek.y == hide.y:
         seek.reset()
         hide.reset()
-        print("Gotcha!")
+        episodes.append(episode_total_reward)
+        episode_total_reward = 0.0
+        episode_count += 1
+        seek.update_target_network()
+        print(f"Gotcha! Episode nb: {episode_count} | Epsilon: {seek.epsilon}")
             
     frame_count += 1
         
@@ -43,6 +52,26 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             seek.save_model('seeker.keras')
+            
+            plt.figure(figsize=(12, 5))
+            
+            # left graph = reewards
+            plt.subplot(1, 2, 1) # 1 row, 2 cols, 1st graph
+            plt.plot(episodes, color='green')
+            plt.title('Seeker Total Reward per Episode')
+            plt.xlabel('Episode')
+            plt.ylabel('Score')
+            
+            # right graph = loss
+            plt.subplot(1, 2, 2) # 1 row, 2 cols, 2nd graph
+            plt.plot(seek.loss_history, color='red')
+            plt.title('Neural Network Loss')
+            plt.xlabel('Training Steps')
+            plt.ylabel('Loss')
+            
+            plt.savefig('performance_graphs.png')
+            print("Model and graphs saved successfully.")
+            
             pygame.quit()
             sys.exit()
         
