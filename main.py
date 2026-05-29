@@ -13,62 +13,106 @@ pygame.display.set_caption("Multi agent Hide & Seek")
 clock = pygame.time.Clock()
 
 env = Environment()
-seek = Agent(1, 1, RED)
+seek = Agent(1, 1, RED, role="seeker")
 # seek.load_model('seeker.keras')
-hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE)
-episode_total_reward = 0.0
-episodes = []
+hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE, role="hider")
+seeker_episode_total_reward = 0.0
+seeker_episodes = []
+hider_episode_total_reward = 0.0
+hider_episodes = []
 episode_count = 0
+step_count = 0
 
 
 # main loop
 running = True
 frame_count = 0
+seek.reset(env, hide)
+hide.reset(env, seek)
 while running:
     
     # seek logic
-    step_reward = seek.think_and_move(env, hide)
-    episode_total_reward += step_reward
+    seeker_step_reward = seek.think_and_move(env, hide)
+    seeker_episode_total_reward += seeker_step_reward
     if len(seek.memory) >= 64 and frame_count % 10 == 0:
-            seek.train(64)
-                
-    if seek.x == hide.x and seek.y == hide.y:
-        seek.reset()
-        hide.reset()
-        episodes.append(episode_total_reward)
-        episode_total_reward = 0.0
-        episode_count += 1
-        seek.update_target_network()
-        print(f"Gotcha! Episode nb: {episode_count} | Epsilon: {seek.epsilon}")
+        seek.train(64)
             
+    # hider logic
+    hider_step_reward = hide.think_and_move(env, seek)
+    hider_episode_total_reward += hider_step_reward
+    if len(hide.memory) >= 64 and frame_count % 10 == 0:
+        hide.train(64)
+    
+    # reset            
+    if seek.x == hide.x and seek.y == hide.y:
+        seek.reset(env, hide)
+        hide.reset(env, seek)
+        seeker_episodes.append(seeker_episode_total_reward)
+        hider_episodes.append(hider_episode_total_reward)
+        seeker_episode_total_reward = 0.0
+        hider_episode_total_reward = 0.0
+        episode_count += 1
+        step_count = 0
+        seek.update_target_network()
+        hide.update_target_network()
+        print(f"Gotcha! Episode nb: {episode_count} | Epsilon: {seek.epsilon}")
+    elif step_count >= MAX_STEPS:
+        seek.reset(env, hide)
+        hide.reset(env, seek)
+        seeker_episode_total_reward -= 1.0
+        hider_episode_total_reward += 1.0
+        seeker_episodes.append(seeker_episode_total_reward)
+        hider_episodes.append(hider_episode_total_reward)
+        seeker_episode_total_reward = 0.0
+        hider_episode_total_reward = 0.0
+        episode_count += 1
+        step_count = 0
+        seek.update_target_network()
+        hide.update_target_network()
+        print(f"MAX STEPS reached, episode: {episode_count} | Epsilon: {seek.epsilon}")
+    
+    step_count += 1 
     frame_count += 1
         
-    if frame_count % 10 == 0:
-        options = [(0, - 1), (0, 1), (1, 0), (-1, 0), (0, 0)]
-        dx, dy = random.choice(options)
-        hide.move(dx, dy, env)
+    
         
     # event logic
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             seek.save_model('seeker.keras')
+            hide.save_model('hider.keras')
             
-            plt.figure(figsize=(12, 5))
+            plt.figure(figsize=(15, 10))
             
-            # left graph = reewards
-            plt.subplot(1, 2, 1) # 1 row, 2 cols, 1st graph
-            plt.plot(episodes, color='green')
+            # left graph = seeker rewards
+            plt.subplot(2, 2, 1) # 1 row, 2 cols, 1st graph
+            plt.plot(seeker_episodes, color='green')
             plt.title('Seeker Total Reward per Episode')
             plt.xlabel('Episode')
             plt.ylabel('Score')
             
-            # right graph = loss
-            plt.subplot(1, 2, 2) # 1 row, 2 cols, 2nd graph
+            # right graph = seeker loss
+            plt.subplot(2, 2, 2) # 1 row, 2 cols, 2nd graph
             plt.plot(seek.loss_history, color='red')
-            plt.title('Neural Network Loss')
+            plt.title('Seeker Neural Network Loss')
             plt.xlabel('Training Steps')
             plt.ylabel('Loss')
             
+            # left graph = hider rewards
+            plt.subplot(2, 2, 3) # 1 row, 2 cols, 1st graph
+            plt.plot(hider_episodes, color='blue')
+            plt.title('Hider Total Reward per Episode')
+            plt.xlabel('Episode')
+            plt.ylabel('Score')
+            
+            # right graph = hider loss
+            plt.subplot(2, 2, 4) # 1 row, 2 cols, 2nd graph
+            plt.plot(hide.loss_history, color='magenta')
+            plt.title('Hider Neural Network Loss')
+            plt.xlabel('Training Steps')
+            plt.ylabel('Loss')
+            
+            plt.tight_layout()
             plt.savefig('performance_graphs.png')
             print("Model and graphs saved successfully.")
             
