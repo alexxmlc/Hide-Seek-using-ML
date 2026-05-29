@@ -1,7 +1,7 @@
 CELL_SIZE = 40
 GRID_WIDTH = 25
 GRID_HEIGHT = 20
-MAX_STEPS = 200
+MAX_STEPS = 400
 
 WHITE = (255, 255, 255) # flooe
 BLACK = (0, 0, 0)       # wall
