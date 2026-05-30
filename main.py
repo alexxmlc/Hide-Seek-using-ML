@@ -18,6 +18,7 @@ seek = Agent(1, 1, RED, role="seeker")
 seek.load_model('seeker.keras')
 
 hide = Agent(GRID_WIDTH - 2, GRID_HEIGHT - 2, BLUE, role="hider")
+hide.load_model('hider.keras')
 
 seeker_episode_total_reward = 0.0
 seeker_episodes = []
@@ -69,10 +70,10 @@ while running:
         seek.train(64)
             
     # hider logic
-    # hider_step_reward = hide.think_and_move(env, seek)
-    # hider_episode_total_reward += hider_step_reward
-    # if len(hide.memory) >= 64 and frame_count % 10 == 0:
-    #     hide.train(64)
+    hider_step_reward = hide.think_and_move(env, seek)
+    hider_episode_total_reward += hider_step_reward
+    if len(hide.memory) >= 64 and frame_count % 10 == 0:
+        hide.train(64)
     
     # reset            
     if seek.x == hide.x and seek.y == hide.y:
@@ -95,13 +96,25 @@ while running:
         randomize_spawns(seek, hide, env)
         seek.update_target_network()
         hide.update_target_network()
-        print(f"Gotcha! Episode nb: {episode_count} | Epsilon: {seek.epsilon}")
+        print(f"Gotcha! Episode nb: {episode_count} | Seeker Epsilon: {seek.epsilon} | Hider Epsilon: {hide.epsilon}")
         
     elif step_count >= MAX_STEPS:
         seeker_episode_total_reward -= 1.0
         hider_episode_total_reward += 1.0
         seeker_episodes.append(seeker_episode_total_reward)
         hider_episodes.append(hider_episode_total_reward)
+        
+        # flash mem for hider
+        # survived -> take his last step and mark it to +1.0
+        if len(hide.memory) > 0:
+            old_st, act, r, new_st, d = hide.memory[-1]
+            hider_win_mem = (old_st, act, 1.0, new_st, True)
+            hide.memory[-1] = hider_win_mem # upodate last mem
+            
+            # copy it 5 times to study it more
+            for _ in range(5):
+                hide.memory.append(hider_win_mem)
+        
         seeker_episode_total_reward = 0.0
         hider_episode_total_reward = 0.0
         episode_count += 1

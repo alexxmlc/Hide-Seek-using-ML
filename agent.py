@@ -131,7 +131,15 @@ class Agent:
             
         reward, done = self.move(dx, dy, env, target)
         
-        if reward == -0.05:
+        if self.role == "hider":
+            if reward == 1.0:
+                # Hider steps on seeker
+                reward -= 1.0
+            elif reward == -0.05:
+                # Hider steps on an empty floor -> reward it
+                reward = 00.5
+        
+        elif reward == -0.05:
             current_pos = (self.x, self.y)
             if current_pos in self.visited_tiles:
                 reward -= 0.05  # Wiggle Penalty: punish for its own footprints
